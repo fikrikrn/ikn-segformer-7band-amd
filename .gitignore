@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data & model artifacts (besar, spesifik-mesin, tidak untuk di-commit).
+# Struktur folder data/ dan outputs/ TETAP di-commit (lihat README.md di
+# masing-masing subfolder) supaya jelas file apa yang taruh di mana —
+# hanya isi data/model aktualnya yang diabaikan lewat pola ekstensi & path
+# di bawah ini.
+*.pth
+*.ckpt
+*.npy
+*.tif
+*.tiff
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qpj
+*.gpkg
+*.json
+*.png
+
+# Folder hasil generate otomatis (bukan struktur tetap, jadi diabaikan utuh)
+outputs/job_*/
+data/processed/masks_backup/
+
+# Hasil sementara script accuracy_assessment (path hardcoded per job)
+output_analisis_*/
+
+# Log & cache lain
+*.log
+.ipynb_checkpoints/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+constraints_torch.txt

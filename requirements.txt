@@ -1,0 +1,166 @@
+# requirements.txt — SegFormer 7-Band Land Cover Pipeline (versi AMD / ROCm)
+#
+# Target mesin : Windows 11, Python 3.12 (64-bit)
+#                AMD Radeon RX 9070 16 GB (RDNA4, gfx1201) + Ryzen 7 7700
+#                Juga untuk RX 9070 XT 16 GB (gfx1201) — lihat bagian
+#                "CATATAN RX 9070 XT" di bawah.
+#
+# =============================================================================
+# CARA INSTALL
+# =============================================================================
+# Prasyarat: Python 3.12 64-bit (cek: py -3.12 --version), driver AMD
+# Adrenalin terbaru (minimal 26.2.2), tidak ada "AMD HIP SDK" lama di PATH.
+#
+# ── Cara cepat (otomatis) ── dari CMD (bukan PowerShell) di root project:
+#
+#     setup_venv.bat
+#
+#   venv lama bermasalah? hapus dulu:   rmdir /s /q venv
+#
+# ── Cara manual (sama dengan isi setup_venv.bat) ── dari CMD di root project:
+#
+#   1. Buat & aktifkan venv Python 3.12
+#        py -3.12 -m venv venv
+#        venv\Scripts\activate
+#        python -m pip install --upgrade pip setuptools wheel
+#
+#   2. PyTorch ROCm dari repo AMD. torch & torchvision WAJIB versi berpasangan
+#      (lihat masalah no. 1 di bawah):
+#        python -m pip install --no-cache-dir --index-url https://stable.repo.amd.com/rocm/whl-next/ "torch[device-gfx1201]==2.13.0+rocm10.1.0" "torchvision[device-gfx1201]==0.28.0+rocm10.1.0"
+#
+#   3. Sisa dependency dari file ini. constraints_torch.txt mengunci torch &
+#      torchvision supaya tidak tertimpa torch CPU/versi lain dari PyPI:
+#        python -m pip install -r requirements.txt -c constraints_torch.txt
+#
+#   4. Cek GPU:
+#        python gpu_utils.py
+#      Harus muncul "Dipakai : AMD Radeon RX 9070 [15.9 GB, gfx1201]" dan
+#      "Uji conv/matmul/backward OK". Di RX 9070 XT namanya
+#      "AMD Radeon RX 9070 XT [15.9 GB, gfx1201]".
+#
+# JANGAN jalankan `pip install -r requirements.txt` sebelum langkah 2: pip akan
+# memasang torch CPU dari PyPI yang tidak bisa memakai GPU AMD.
+#
+# =============================================================================
+# CATATAN RX 9070 XT
+# =============================================================================
+# RX 9070 XT memakai chip yang sama dengan RX 9070 (Navi 48, RDNA4, gfx1201,
+# 16 GB GDDR6). Bedanya hanya jumlah compute unit (64 vs 56), clock lebih
+# tinggi, dan daya lebih besar (TBP ~304 W vs ~220 W). Akibatnya:
+#
+#   - Wheel PyTorch SAMA: "torch[device-gfx1201]" / "torchvision[device-gfx1201]"
+#     di langkah 2 & setup_venv.bat. Tidak perlu wheel atau index lain.
+#   - config.py TIDAK perlu diubah: Config.GPU_ARCH = "gfx1201" cocok untuk
+#     9070 maupun 9070 XT; gpu_utils.py memilih GPU berdasarkan arsitektur,
+#     bukan nama kartu, dan tetap melewati iGPU Ryzen (gfx1036).
+#   - VRAM sama (16 GB) -> INFERENCE_BATCH_SIZE = 16 dan batch training tetap
+#     aman. Kecepatan per batch biasanya sedikit lebih cepat daripada 9070;
+#     angka benchmark di config.py diukur di RX 9070.
+#   - Config.USE_MIOPEN = False tetap berlaku (bug paket ROCm Windows, bukan
+#     bug kartu). Jangan set HSA_OVERRIDE_GFX_VERSION.
+#   - Driver: Adrenalin terbaru (minimal 26.2.2), sama seperti 9070.
+#   - Daya: PSU 850 W di PC ini cukup (AMD menyarankan >= 750 W untuk 9070 XT);
+#     pakai 2-3 kabel PCIe 8-pin terpisah sesuai model kartu, jangan
+#     di-daisy-chain dari satu kabel.
+#   - Kalau gpu_utils.py memilih GPU yang salah (mis. ada 2 GPU diskrit),
+#     paksa lewat Config.GPU_INDEX.
+#
+# Bukan untuk RX 9060 XT / 9060: arsitekturnya gfx1200, jadi wheel gfx1201
+# dan Config.GPU_ARCH = "gfx1201" tidak cocok.
+#
+# =============================================================================
+# KOMBINASI VERSI YANG SUDAH TERUJI (23-10-2026, inference INPUT\E3.tif OK)
+# =============================================================================
+#   torch 2.13.0+rocm10.1.0      torchvision 0.28.0+rocm10.1.0     rocm 10.1.0
+#   (ikut terpasang: amd-torch-device-gfx1201, amd-torch-device-gfx12-0,
+#    amd-torchvision-device-gfx1201, rocm-sdk-core/-libraries/-device-gfx1201)
+#   transformers 5.20.2    safetensors 0.8.0     huggingface_hub 2.2.0
+#   albumentations 2.0.8   rasterio 1.5.2        geopandas 1.2.0
+#   pyogrio 0.13.0         shapely 2.2.0         pyproj 3.8.0
+#   topojson 2.2           opencv-python-headless 5.0.0.93
+#   scikit-image 0.26.0    pillow 13.0.0         numpy 2.5.4
+#   pandas 3.1.0           scipy 1.18.1          scikit-learn 1.9.1
+#   matplotlib 3.11.2      seaborn 0.13.2        openpyxl 3.1.5     tqdm 4.70.1
+#
+# Kalau versi terbaru suatu paket bikin error, pasang versi teruji di atas, mis.
+#        python -m pip install "transformers==5.20.2"
+#
+# =============================================================================
+# MASALAH YANG SUDAH DITEMUI & SOLUSINYA
+# =============================================================================
+# 1. "RuntimeError: operator torchvision::nms does not exist" lalu
+#    "Could not import module 'SegformerForSemanticSegmentation'"
+#    -> torch & torchvision tidak berpasangan (mis. torch 2.14 + torchvision
+#       0.28). Metadata torchvision ROCm tidak mengunci versi torch, jadi tanpa
+#       pin pip mengambil torch terbaru. Pasangan: torch 2.13 <-> torchvision
+#       0.28, torch 2.14 <-> torchvision 0.29. Per 23-10-2026 torchvision 0.29
+#       belum ada di repo AMD -> tetap di torch 2.13. Ulangi langkah 2.
+#       Cek versi yang tersedia di repo AMD:
+#        python -m pip index versions torchvision --index-url https://stable.repo.amd.com/rocm/whl-next/
+#       Kalau sudah ada pasangan baru, ubah 2 versi di langkah 2, di
+#       setup_venv.bat [3A], dan isi constraints_torch.txt.
+#
+# 2. "MIOpen Error ... MIOpenBatchNormFwdInferSpatial.cpp: HIPRTC_ERROR_COMPILATION"
+#    ("'type_traits' file not found", "miopenStatusUnknownError")
+#    -> bug paket ROCm 10.1 Windows (header C++ tidak ikut terpasang).
+#       Sudah ditangani: Config.USE_MIOPEN = False di config.py -> PyTorch
+#       memakai kernel native, dan malah lebih cepat. Jangan dinyalakan lagi
+#       sebelum AMD memperbaiki paketnya.
+#
+# 3. RAM proses langsung ~27 GB begitu GPU dipakai, model.to(GPU) ~35 detik
+#    -> PYTORCH_HIP_ALLOC_CONF=expandable_segments:True di ROCm Windows.
+#       Sudah ditangani di gpu_utils.setup_gpu_env() (tidak diset di Windows).
+#       Jangan set variabel itu di environment Windows.
+#
+# 4. Yang terpakai iGPU Ryzen (gfx1036, cuda:0), bukan RX 9070
+#    -> sudah ditangani: Config.GPU_ARCH = "gfx1201", gpu_utils.py melewati iGPU.
+#
+# 5. Index ROCm terbaru gagal / tidak tersedia
+#    -> setup_venv.bat otomatis fallback ke rilis resmi ROCm 7.2.1 (torch 2.9.1
+#       + torchvision 0.24.1, butuh driver Adrenalin >= 26.2.2), langkah [3B].
+#
+# =============================================================================
+# Batas bawah versi = versi pertama yang punya wheel Python 3.12 di Windows
+# dan kompatibel dengan kode pipeline ini (mis. albumentations >= 2.0 karena
+# training/train_model.py memakai argumen A.Rotate(fill=..., fill_mask=...)).
+
+# ── Deep learning ──────────────────────────────────────────────────────
+# torch, torchvision   <- dari repo AMD ROCm, lihat CARA INSTALL langkah 2
+transformers>=4.46
+safetensors>=0.4.5
+huggingface_hub>=0.26
+albumentations>=2.0.5
+
+# ── Geospatial (raster & vektor) ────────────────────────────────────────
+rasterio>=1.4.3
+geopandas>=1.0.1
+pyogrio>=0.10
+shapely>=2.0.6
+pyproj>=3.7
+topojson>=1.9
+
+# ── Image processing ─────────────────────────────────────────────────────
+opencv-python-headless>=4.10
+scikit-image>=0.24
+pillow>=10.4
+
+# ── Data & sains ──────────────────────────────────────────────────────────
+numpy>=1.26.4
+pandas>=2.2.3
+scipy>=1.14
+scikit-learn>=1.5.2
+
+# ── Visualisasi ────────────────────────────────────────────────────────────
+matplotlib>=3.9
+seaborn>=0.13.2
+
+# ── Ekspor Excel (accuracy_assessment/*.py via pandas.ExcelWriter) ──────────
+openpyxl>=3.1.5
+
+# ── Utilitas ────────────────────────────────────────────────────────────────
+tqdm>=4.66
+
+# ── Tidak dipakai di versi AMD ───────────────────────────────────────────────
+# cupy-cuda12x / cuda-pathfinder : khusus NVIDIA, tidak dibutuhkan
+#   (inference akumulasi di RAM CPU, GPU hanya lewat PyTorch).
+# torchaudio : tidak diimpor oleh pipeline.
